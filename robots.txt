@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Sitemap: https://YOUR-PROJECT.pages.dev/sitemap.xml
+Sitemap: https://nova-ai-lu0.pages.dev/sitemap.xml
