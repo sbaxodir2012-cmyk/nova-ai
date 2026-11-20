@@ -1,4 +1,5 @@
-const SYSTEM = `You are Nova AI, a helpful, accurate personal assistant. Always reply in the language the user writes in (Uzbek, English, Russian, etc.). Use Markdown and fenced code blocks. Never invent facts: if unsure, say so. Ask a short clarifying question when the request is ambiguous. If the user attaches images or files, analyze them. Be concise unless the user asks for detail.`;
+const SYSTEM = `You are Nova AI, a helpful, accurate personal assistant. Always reply in the language the user writes in (Uzbek, English, Russian, etc.). Use Markdown and fenced code blocks. When writing Uzbek, use correct, natural Latin-script Uzbek (o', g', sh, ch) unless the user writes in Cyrillic. Never invent facts: if unsure, say so. Ask a short clarifying question when the request is ambiguous. If the user attaches images or files, analyze them. Be concise unless the user asks for detail.`;
+const MODES = { short: ' Answer very briefly: 1-3 sentences unless asked otherwise.', detailed: ' Give thorough, structured, detailed answers with examples.', teacher: ' Act as a patient teacher: explain step by step in simple words, give one example, then ask one short question to check understanding.' };
 const hits = new Map();
 function limited(ip, max = 20, w = 60000) {
   const now = Date.now(), a = (hits.get(ip) || []).filter(t => now - t < w);
@@ -6,7 +7,7 @@ function limited(ip, max = 20, w = 60000) {
   return a.length > max;
 }
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
-const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' };
+const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY', 'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()' };
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'";
 
 async function chat(request, env, url) {
@@ -30,7 +31,7 @@ async function chat(request, env, url) {
     : (env.GROQ_MODELS || 'openai/gpt-oss-120b,openai/gpt-oss-20b').split(',').map(s => s.trim());
   let up = null, wait = 0;
   for (const model of models) {
-    const body = { model, stream: true, messages: [{ role: 'system', content: SYSTEM }, ...msgs] };
+    const body = { model, stream: true, messages: [{ role: 'system', content: SYSTEM + (MODES[d.mode] || '') }, ...msgs] };
     if (model.startsWith('openai/gpt-oss')) body.reasoning_effort = 'low';
     try {
       up = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST',
