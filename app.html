@@ -33,7 +33,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0}
 textarea{flex:1;resize:none;border:0;outline:0;background:none;color:var(--tx);font:inherit;max-height:180px;padding:6px}
 #send{background:var(--ac);color:#fff;border-radius:10px;padding:8px 14px}#send:disabled{opacity:.5}
 .note{text-align:center;font-size:12px;color:var(--mu);margin-top:6px}
-#menu{display:none}
+#clip{font-size:18px;padding:4px 8px}#menu{display:none}
 @keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes b{50%{transform:translateY(-5px)}}
 @media(max-width:760px){aside{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%)}aside.open{transform:none}#menu{display:block}}
 </style></head>
@@ -48,14 +48,14 @@ textarea{flex:1;resize:none;border:0;outline:0;background:none;color:var(--tx);f
 <main>
 <div class="top"><button id="menu" aria-label="Menu">☰</button><b id="title">Nova AI</b></div>
 <div id="msgs"><div class="w" id="w"></div></div>
-<div class="bar"><div class="box"><textarea id="in" rows="1" placeholder="Ask Nova anything…" aria-label="Message"></textarea><button id="send">Send</button></div>
+<div class="bar"><div id="att" style="max-width:780px;margin:0 auto 6px;display:flex;gap:6px;flex-wrap:wrap"></div><div class="box"><button id="clip" title="Fayl yoki rasm" aria-label="Attach">📎</button><input type="file" id="file" multiple accept="image/*,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.sql,.xml,.log" hidden><textarea id="in" rows="1" placeholder="Ask Nova anything…" aria-label="Message"></textarea><button id="send">Send</button></div>
 <div class="note">Nova AI can make mistakes. Chats are stored only in your browser.</div></div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 let chats=[],cur=null,busy=false,ctl=null;
 const load=()=>{try{chats=JSON.parse(localStorage.getItem('nova.chats')||'[]')}catch{chats=[]}};
-const save=()=>{try{localStorage.setItem('nova.chats',JSON.stringify(chats))}catch{}};
+const save=()=>{try{localStorage.setItem('nova.chats',JSON.stringify(chats,(k,v)=>k==='images'?undefined:v))}catch{}};
 const get=()=>chats.find(c=>c.id===cur);
 const md=t=>DOMPurify.sanitize(marked.parse(t,{breaks:true}));
 function hl(el){el.querySelectorAll('pre code').forEach(b=>{try{hljs.highlightElement(b)}catch{}})}
@@ -72,7 +72,7 @@ function renderList(){
 }
 function msgEl(m,i,last){
   const e=document.createElement('div');e.className='m '+(m.role==='user'?'u':'a');
-  if(m.role==='user'){const d=document.createElement('div');d.textContent=m.content;e.append(d);return e}
+  if(m.role==='user'){const d=document.createElement('div');d.textContent=m.shown||m.content;e.append(d);return e}
   const b=document.createElement('div');b.className='md'+(m.error?' err':'');b.innerHTML=m.error?DOMPurify.sanitize(m.content):md(m.content);hl(b);e.append(b);
   const a=document.createElement('div');a.className='act';
   const c=document.createElement('button');c.textContent='Copy';c.onclick=()=>{navigator.clipboard.writeText(m.content);c.textContent='Copied ✓';setTimeout(()=>c.textContent='Copy',1200)};a.append(c);
@@ -89,26 +89,36 @@ async function run(){
   const c=get();busy=true;$('send').textContent='Stop';
   const box=document.createElement('div');box.className='m a';box.innerHTML='<div class="md"><div class="dots"><span></span><span></span><span></span></div></div>';
   $('w').append(box);$('msgs').scrollTop=1e9;
-  const hist=c.messages.slice(-30).filter(m=>!m.error).map(({role,content})=>({role,content}));
+  const hist=c.messages.slice(-30).filter(m=>!m.error).map(({role,content,images},i,a)=>i===a.length-1&&images?{role,content,images}:{role,content});
   let out='',failed=null;ctl=new AbortController();
   try{
     const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist}),signal:ctl.signal});
-    if(!r.ok){let j={};try{j=await r.json()}catch{}throw new Error(j.error||'Request failed ('+r.status+')')}
+    if(!r.ok){let j={};try{j=await r.json()}catch{}throw new Error(j.error||"So'rov bajarilmadi ("+r.status+')')}
     const rd=r.body.getReader(),dc=new TextDecoder();
     for(;;){const{done,value}=await rd.read();if(done)break;out+=dc.decode(value,{stream:true});
       const el=box.querySelector('.md');el.innerHTML=md(out);hl(el);$('msgs').scrollTop=1e9}
-  }catch(e){if(e.name!=='AbortError')failed=e.message}
+  }catch(e){if(e.name!=='AbortError')failed=e.name==='TypeError'?"Internet aloqasi yo'q yoki server javob bermadi.":e.message}
   if(failed)c.messages.push({role:'assistant',content:'⚠️ '+failed,error:true});
   else if(out)c.messages.push({role:'assistant',content:out});
   c.t=Date.now();save();busy=false;ctl=null;$('send').textContent='Send';render();
 }
 function send(){
   if(busy){ctl&&ctl.abort();return}
-  const t=$('in').value.trim();if(!t)return;if(t.length>8000){alert('Message too long (max 8000 characters).');return}
-  let c=get();if(!c){c={id:crypto.randomUUID(),title:t.slice(0,40),messages:[],t:Date.now()};chats.push(c);cur=c.id}
-  c.messages.push({role:'user',content:t});$('in').value='';$('in').style.height='auto';save();render();run();
+  const t=$('in').value.trim();if(!t&&!att.length)return;if(t.length>8000){alert('Xabar juda uzun (maks. 8000 belgi).');return}
+  const imgs=att.filter(f=>f.image).map(f=>f.data),full=(t||'Buni tahlil qil.')+att.filter(f=>!f.image).map(f=>'\n\n📄 '+f.name+':\n```\n'+f.data+'\n```').join('');
+  const shown=t+att.map(f=>'\n'+(f.image?'🖼 ':'📄 ')+f.name).join('');
+  let c=get();if(!c){c={id:crypto.randomUUID(),title:(t||att[0].name).slice(0,40),messages:[],t:Date.now()};chats.push(c);cur=c.id}
+  c.messages.push({role:'user',content:full,shown,images:imgs.length?imgs:undefined});att=[];showAtt();$('in').value='';$('in').style.height='auto';save();render();run();
 }
 function regen(){const c=get();if(!c||busy)return;while(c.messages.length&&c.messages[c.messages.length-1].role==='assistant')c.messages.pop();save();render();run()}
+let att=[];
+function showAtt(){const a=$('att');a.innerHTML='';att.forEach((f,i)=>{const s=document.createElement('span');s.style.cssText='background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:3px 8px;font-size:13px;cursor:pointer';s.textContent=(f.image?'🖼 ':'📄 ')+f.name+' ✕';s.onclick=()=>{att.splice(i,1);showAtt()};a.append(s)})}
+function shrink(file){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);im.onload=()=>{const k=Math.min(1,1024/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.8))};im.onerror=rej;im.src=u})}
+$('clip').onclick=()=>$('file').click();
+$('file').onchange=async e=>{for(const f of e.target.files){try{
+  if(f.type.startsWith('image/')){if(att.filter(x=>x.image).length>=3){alert("Ko'pi bilan 3 ta rasm.");continue}att.push({name:f.name,image:true,data:await shrink(f)})}
+  else{if(f.size>20000){alert(f.name+': fayl katta (maks. 20 KB).');continue}att.push({name:f.name,data:await f.text()})}
+ }catch{alert(f.name+" ni o'qib bo'lmadi.")}}e.target.value='';showAtt()};
 $('send').onclick=send;
 $('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 $('in').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
