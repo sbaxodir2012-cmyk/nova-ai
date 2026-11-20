@@ -19,15 +19,24 @@ header{display:flex;justify-content:space-between;align-items:center}.logo{displ
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:30px 0}
 .card{background:#141a3a;border:1px solid #232a55;border-radius:16px;padding:20px}.card h2{font-size:18px;margin:0 0 6px}.card p{margin:0;color:#aab0d6}
 footer{color:#8087b0;text-align:center;font-size:14px}
+body{background:radial-gradient(900px 500px at 50% -10%,#3b1d8f66,transparent),#0b1026}
+.hero img{animation:fl 4s ease-in-out infinite;filter:drop-shadow(0 0 30px #7c3aed)}
+h1 span{background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.btn{transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px #7c3aed66}
+.card{transition:transform .25s,border-color .25s}.card:hover{transform:translateY(-4px);border-color:#7c3aed}
+.hero,.grid{animation:up .7s both}
+@keyframes fl{50%{transform:translateY(-10px)}}@keyframes up{from{opacity:0;transform:translateY(16px)}}
 </style></head>
 <body>
 <header><div class="logo"><img src="/favicon.svg" width="32" height="32" alt="Nova AI logo">Nova AI</div><a class="btn" href="/app.html">Open Nova</a></header>
 <main>
-<section class="hero"><h1>Nova AI — Your Intelligent Personal Assistant</h1><p>Ask Anything. Learn Everything.</p><p><a class="btn" href="/app.html">Start chatting free</a></p></section>
+<section class="hero"><img src="/favicon.svg" width="88" height="88" alt="Nova AI logo"><h1>Nova AI — <span>Your Intelligent Personal Assistant</span></h1><p>Ask Anything. Learn Everything.</p><p><a class="btn" href="/app.html">Start chatting free</a></p></section>
 <section class="grid" aria-label="Features">
 <article class="card"><h2>Multilingual</h2><p>Chat in Uzbek, English, Russian and many other languages.</p></article>
 <article class="card"><h2>Code help</h2><p>Generate, explain and debug code with syntax highlighting.</p></article>
 <article class="card"><h2>Writing &amp; translation</h2><p>Draft articles, documents and translate text instantly.</p></article>
+<article class="card"><h2>Internet search</h2><p>Turn on the 🌐 button for answers with fresh information from the web.</p></article>
+<article class="card"><h2>Voice &amp; files</h2><p>Speak your question, listen to answers, attach images and text files.</p></article>
 <article class="card"><h2>Private history</h2><p>Chats are saved only in your browser, never on our servers.</p></article>
 </section>
 <section class="card"><h2>About Nova AI</h2><p>Nova AI is a free AI chat assistant powered by large language models. It can make mistakes, so please verify important information.</p></section>

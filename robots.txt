@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Sitemap: https://nova-ai-lu0.pages.dev/sitemap.xml
+Disallow: /admin.html

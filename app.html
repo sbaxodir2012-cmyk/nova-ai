@@ -48,7 +48,7 @@ textarea{flex:1;resize:none;border:0;outline:0;background:none;color:var(--tx);f
 <main>
 <div class="top"><button id="menu" aria-label="Menu">☰</button><b id="title">Nova AI</b><select id="mode" aria-label="Rejim"><option value="">Oddiy</option><option value="short">Qisqa</option><option value="detailed">Batafsil</option><option value="teacher">O'qituvchi</option></select><button id="share" title="Ulashish">↗</button><button id="dl" title="Yuklab olish">⬇</button></div>
 <div id="msgs"><div class="w" id="w"></div></div>
-<div class="bar"><div id="att" style="max-width:780px;margin:0 auto 6px;display:flex;gap:6px;flex-wrap:wrap"></div><div class="box"><button id="clip" title="Fayl yoki rasm" aria-label="Attach">📎</button><button id="mic" title="Gapirib yozish">🎤</button><button id="lang" title="Ovoz tili">UZ</button><input type="file" id="file" multiple accept="image/*,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.sql,.xml,.log" hidden><textarea id="in" rows="1" placeholder="Ask Nova anything…" aria-label="Message"></textarea><button id="send">Send</button></div>
+<div class="bar"><div id="att" style="max-width:780px;margin:0 auto 6px;display:flex;gap:6px;flex-wrap:wrap"></div><div class="box"><button id="clip" title="Fayl yoki rasm" aria-label="Attach">📎</button><button id="mic" title="Gapirib yozish">🎤</button><button id="lang" title="Ovoz tili">UZ</button><button id="web" title="Internetdan qidirish">🌐</button><input type="file" id="file" multiple accept="image/*,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.sql,.xml,.log" hidden><textarea id="in" rows="1" placeholder="Ask Nova anything…" aria-label="Message"></textarea><button id="send">Send</button></div>
 <div class="note">Nova AI can make mistakes. Chats are stored only in your browser.</div></div>
 </main>
 <script>
@@ -92,7 +92,7 @@ async function run(){
   const hist=c.messages.slice(-30).filter(m=>!m.error).map(({role,content,images},i,a)=>i===a.length-1&&images?{role,content,images}:{role,content});
   let out='',failed=null;ctl=new AbortController();
   try{
-    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,mode:$('mode').value}),signal:ctl.signal});
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,mode:$('mode').value,search:web}),signal:ctl.signal});
     if(!r.ok){let j={};try{j=await r.json()}catch{}throw new Error(j.error||"So'rov bajarilmadi ("+r.status+')')}
     const rd=r.body.getReader(),dc=new TextDecoder();
     for(;;){const{done,value}=await rd.read();if(done)break;out+=dc.decode(value,{stream:true});
@@ -132,6 +132,9 @@ $('dl').onclick=()=>{const c=get();if(!c)return;const a=document.createElement('
 $('share').onclick=async()=>{const c=get();if(!c)return;try{if(navigator.share)await navigator.share({title:c.title,text:txt(c)});else{await navigator.clipboard.writeText(txt(c));alert('Chat nusxalandi.')}}catch{}};
 try{$('mode').value=localStorage.getItem('nova.mode')||''}catch{}
 $('mode').onchange=()=>{try{localStorage.setItem('nova.mode',$('mode').value)}catch{}};
+let web=false;$('web').style.opacity=.45;
+$('web').onclick=()=>{web=!web;$('web').style.opacity=web?1:.45;$('web').title=web?"Internet YOQILGAN":"Internet o'chiq"};
+try{if(!localStorage.getItem('nova.vid')){localStorage.setItem('nova.vid',1);fetch('/api/hit',{method:'POST'})}}catch{}
 $('send').onclick=send;
 $('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 $('in').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});

@@ -10,7 +10,12 @@ const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: 
 const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY', 'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()' };
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'";
 
-async function chat(request, env, url) {
+async function bump(env, f) {
+  if (!env.STATS) return;
+  try { const k = 'd:' + new Date().toISOString().slice(0, 10), o = JSON.parse((await env.STATS.get(k)) || '{}');
+    for (const x of f) o[x] = (o[x] || 0) + 1; await env.STATS.put(k, JSON.stringify(o), { expirationTtl: 7776000 }); } catch {}
+}
+async function chat(request, env, url, ctx) {
   const origin = request.headers.get('Origin');
   if (origin && new URL(origin).host !== url.host) return J({ error: "Ruxsat yo'q." }, 403);
   if (limited(request.headers.get('CF-Connecting-IP') || 'x')) return J({ error: "Juda ko'p so'rov. Bir daqiqadan keyin urinib ko'ring." }, 429);
@@ -24,23 +29,27 @@ async function chat(request, env, url) {
   if (!env.GROQ_API_KEY) return J({ error: 'Server sozlanmagan.' }, 500);
 
   const last = m[n - 1], vision = !!last.images?.length;
+  ctx.waitUntil(bump(env, ['q', vision && 'i', d.search && !vision && 's'].filter(Boolean)));
   const msgs = m.map(({ role, content }, i) => i === n - 1 && vision
     ? { role, content: [{ type: 'text', text: content }, ...last.images.map(u => ({ type: 'image_url', image_url: { url: u } }))] }
     : { role, content });
   const models = vision ? [env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b']
     : (env.GROQ_MODELS || 'openai/gpt-oss-120b,openai/gpt-oss-20b').split(',').map(s => s.trim());
   let up = null, wait = 0;
-  for (const model of models) {
+  const tries = d.search && !vision ? [[models[0], 1], ...models.map(x => [x, 0])] : models.map(x => [x, 0]);
+  for (const [model, srch] of tries) {
     const body = { model, stream: true, messages: [{ role: 'system', content: SYSTEM + (MODES[d.mode] || '') }, ...msgs] };
     if (model.startsWith('openai/gpt-oss')) body.reasoning_effort = 'low';
+    if (srch) { body.tools = [{ type: 'browser_search' }]; body.tool_choice = 'required'; }
     try {
       up = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST',
         headers: { Authorization: 'Bearer ' + env.GROQ_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     } catch { up = null; continue; }
     if (up.ok) break;
     if (up.status === 429) wait = Math.max(wait, +up.headers.get('retry-after') || 0);
-    else if (up.status < 500) break;
+    else if (up.status < 500 && !srch) break;
   }
+  if (!up || !up.ok) ctx.waitUntil(bump(env, ['e']));
   if (!up) return J({ error: "AI xizmatiga ulanib bo'lmadi. Birozdan keyin urinib ko'ring." }, 502);
   if (!up.ok) {
     if (up.status !== 429) return J({ error: `AI xatosi (${up.status}). Qayta urinib ko'ring.` }, 502);
@@ -56,9 +65,18 @@ async function chat(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/chat') return request.method === 'POST' ? chat(request, env, url) : J({ error: 'Method not allowed' }, 405);
+    if (url.pathname === '/api/chat') return request.method === 'POST' ? chat(request, env, url, ctx) : J({ error: 'Method not allowed' }, 405);
+    if (url.pathname === '/api/hit' && request.method === 'POST') { ctx.waitUntil(bump(env, ['v'])); return J({ ok: 1 }); }
+    if (url.pathname === '/api/stats') {
+      if (limited('s' + (request.headers.get('CF-Connecting-IP') || 'x'), 10)) return J({ error: "Ko'p urinish." }, 429);
+      if (!env.ADMIN_KEY || request.headers.get('Authorization') !== 'Bearer ' + env.ADMIN_KEY) return J({ error: "Ruxsat yo'q." }, 401);
+      if (!env.STATS) return J({ error: 'KV ulanmagan.' }, 500);
+      const l = await env.STATS.list({ prefix: 'd:' }), days = [];
+      for (const k of l.keys.slice(-30)) days.push({ d: k.name.slice(2), ...JSON.parse((await env.STATS.get(k.name)) || '{}') });
+      return J({ days });
+    }
     const r = await env.ASSETS.fetch(request), h = new Headers(r.headers);
     for (const [k, v] of Object.entries(SEC)) h.set(k, v);
     if ((h.get('Content-Type') || '').includes('text/html')) h.set('Content-Security-Policy', CSP);
